@@ -1,3 +1,4 @@
+import numpy as np
 import math
 from random import *
 
@@ -84,6 +85,63 @@ class Ball:
         else:
             return False
 
+class Shell:
+    def __init__(self, screen: pygame.Surface, x=40, y=450):
+        """ Конструктор класса shell
+
+        Args:
+        x - начальное положение снаряда по горизонтали
+        y - начальное положение снарядаа по вертикали
+        """
+        
+        self.screen = screen
+        self.x = x
+        self.y = y
+        self.vx = 0
+        self.vy = 0
+        self.color = choice(GAME_COLORS)
+        self.live = 30
+
+    def move(self):
+        """Переместить снаряд по прошествии единицы времени.
+        Метод описывает перемещение снаряда за один кадр перерисовки. То есть, обновляет значения
+        self.x и self.y с учетом скоростей self.vx и self.vy и стен по краям окна (размер окна 800х600).
+        """
+        self.vy -= 1
+        self.vx *= 0.98
+        self.x += self.vx
+        self.y -= self.vy
+        if self.x <= 10:
+            self.x = 10
+            self.vx = -self.vx * 0.5
+        if self.x >= 790:
+            self.x = 790
+            self.vx = -self.vx * 0.5
+        if self.y <= 10:
+            self.y = 10
+            self.vy = -self.vy * 0.5
+        if self.y >= 590:
+            self.y = 590
+            self.vy = -self.vy * 0.5
+
+    def draw(self):
+        pygame.draw.line(self.screen, self.color, [self.x, self.y], [self.x - 20*np.sign(self.vx), self.y], 5)
+        pygame.draw.line(self.screen, self.color, [self.x, self.y], [self.x - 10*np.sign(self.vx), self.y - 10], 5)
+        pygame.draw.line(self.screen, self.color, [self.x, self.y], [self.x - 10*np.sign(self.vx), self.y + 10], 5)
+
+    def hittest(self, obj):
+        """Функция проверяет сталкивалкивается ли данный обьект с целью, описываемой в обьекте obj.
+
+        Args:
+            obj: Обьект, с которым проверяется столкновение.
+        Returns:
+            Возвращает True в случае столкновения мяча и цели. В противном случае возвращает False.
+        """
+        
+        if (self.x - obj.x) ** 2 + (self.y - obj.y) ** 2 <= (obj.r) ** 2:
+            return True
+        else:
+            return False  
 
 class Gun:
     def __init__(self, screen):
@@ -110,6 +168,22 @@ class Gun:
         new_ball.vx = self.f2_power * math.cos(self.an)
         new_ball.vy = - self.f2_power * math.sin(self.an)
         balls.append(new_ball)
+        self.f2_on = 0
+        self.f2_power = 10
+
+    def fire_end(self, event):
+        """Выстрел снарядом.
+
+        Происходит при отпускании кнопки мыши.
+        Начальные значения компонент скорости мяча vx и vy зависят от положения мыши.
+        """
+        global shells, bullet
+        bullet += 1
+        new_shell = Shell(self.screen)
+        self.an = math.atan2((event.pos[1]-new_shell.y), (event.pos[0]-new_shell.x))
+        new_shell.vx = self.f2_power * math.cos(self.an)
+        new_shell.vy = - self.f2_power * math.sin(self.an)
+        shells.append(new_shell)
         self.f2_on = 0
         self.f2_power = 10
 
@@ -179,10 +253,79 @@ class Target:
     def hit(self, points=1):
         """Попадание шарика в цель."""
         self.points += points
+        
 
     def draw(self):
         """ Рисует цель.  """
         pygame.draw.circle(self.screen, self.color, (self.x, self.y), self.r)
+
+class Another_Target:
+    def __init__(self, screen):
+        self.screen = screen
+        self.points = 0
+        self.r = 40
+        self.new_target()
+
+    def new_target(self):
+        """ Инициализация новой цели. """
+        x = self.x = randint(600, 780)
+        y = self.y = randint(300, 550)
+        an = self.an = 0
+        vx = self.vx = randint(-10, 10)
+        vy = self.vy = randint(-10, 10)
+        w = self.w = randint(-1, 1)
+        color = self.color = RED
+        self.live = 1
+
+    def move(self):
+        """Переместить цель по прошествии единицы времени.  
+
+        Метод описывает перемещение мяча за один кадр перерисовки. То есть, обновляет значения
+        self.x и self.y с учетом скоростей self.vx и self.vy и стен по краям окна
+        (размер окна 800х600).  
+        
+        """
+        self.x += self.vx
+        self.y -= self.vy
+        self.an += self.w/10
+        if self.x <= 110 + self.r:
+            self.x = 110 + self.r
+            self.vx = -self.vx
+        if self.x >= 790 - self.r:
+            self.x = 790 - self.r
+            self.vx = -self.vx
+        if self.y <= 10 + self.r:
+            self.y = 10 + self.r
+            self.vy = -self.vy
+        if self.y >= 550 - self.r:
+            self.y = 550 - self.r
+            self.vy = -self.vy
+
+    def hit(self, points=1):
+        """Попадание шарика в цель."""
+        self.points += points
+        
+
+    def draw(self):
+        """ Рисует цель.  """
+        
+        # Координаты вершин до поворота в системе координат шестиугольника
+        c_1 = [0, -self.r]
+        c_2 = [(3**(0.5)/2)*self.r, -0.5*self.r]
+        c_3 = [(3**(0.5)/2)*self.r, 0.5*self.r]
+        c_4 = [0, self.r]
+        c_5 = [-(3**(0.5)/2)*self.r, 0.5*self.r]
+        c_6 = [-(3**(0.5)/2)*self.r, -0.5*self.r]
+        coordinates = [c_1, c_2, c_3, c_4, c_5, c_6]
+
+        # Координаты после поворота
+        for i in range(6):
+            cur = coordinates[i]
+            x_new = cur[0]*math.cos(self.an) - cur[1]*math.sin(self.an) + self.x
+            y_new = cur[1]*math.cos(self.an) + cur[0]*math.sin(self.an) + self.y
+            coordinates[i] = [x_new, y_new]
+        pygame.draw.polygon(self.screen, self.color, coordinates)
+        
 
 def print_text(screen, text, x, y, size):
     """Выводит текст на игровой экран.
@@ -202,13 +345,15 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 bullet = 0
 success_hits = []
 balls = []
+shells = []
 
 clock = pygame.time.Clock()
 gun = Gun(screen)
 target1 = Target(screen)
-target2 = Target(screen)
+target2 = Another_Target(screen)
 finished = False
 was_hit = False
+odd_cycle = True
 
 while not finished:
     screen.fill(WHITE)
@@ -217,6 +362,8 @@ while not finished:
     target2.draw()
     for b in balls:
         b.draw()
+    for shell in shells:
+        shell.draw()
     print_text(screen,
                str(target1.points + target2.points),
                10, 10,
@@ -241,7 +388,12 @@ while not finished:
         elif event.type == pygame.MOUSEBUTTONDOWN:
             gun.fire2_start(event)
         elif event.type == pygame.MOUSEBUTTONUP:
-            gun.fire2_end(event)
+            if odd_cycle:
+                gun.fire_end(event)
+                odd_cycle = False
+            else:
+                gun.fire2_end(event)
+                odd_cycle = True
         elif event.type == pygame.MOUSEMOTION:
             gun.targetting(event)
 
@@ -263,6 +415,22 @@ while not finished:
         b.live -= dt
         if b.live <= 0:
             balls.remove(b)
+    for shell in shells:
+        shell.move()
+        if shell.hittest(target1):
+            target1.live = 0
+            target1.hit()
+            target1.new_target()
+            was_hit = True
+        if shell.hittest(target2):
+            target2.live = 0
+            target2.hit()
+            target2.new_target()
+            was_hit = True
+        shell.live -= dt
+        if shell.live <= 0:
+            shells.remove(shell)
+    
             
     if was_hit:
         success_hits.append((pygame.time.get_ticks(), bullet))
